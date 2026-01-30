@@ -1,0 +1,154 @@
+/* =========================
+   App Layout
+========================= */
+
+.app-container {
+  width: 100vw;
+  min-height: 100vh;
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  background-attachment: fixed;
+  display: flex;
+  flex-direction: column;
+}
+.app-content {
+  flex: 1;
+}
+
+.qc-container {
+  max-width: 1280px;
+  margin: 0 auto;
+  width: 100%;
+}
+
+
+/* =========================
+   Header
+========================= */
+.qc-header {
+  width: 100%;
+  min-width: 100vw;
+  background: rgba(255, 255, 255, 0.95);
+  backdrop-filter: blur(10px);
+  box-shadow: 0 5px 20px rgba(0, 0, 0, 0.1);
+}
+
+
+.qc-header-content {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 1.5rem 2rem;
+  gap: 1.5rem;
+}
+
+.qc-header-left {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+}
+
+.qc-logo {
+  display: flex;
+  align-items: center;
+  justify-content: center; /* ถ้าอยู่กลาง header */
+  height: 70px;            /* ปรับตามความสูง header */
+  padding: 8px 16px;
+}
+
+.qc-header-logo {
+  height: 60px;        /* ขนาดกำลังดีสำหรับ header */
+  width: auto;         /* รักษาสัดส่วน */
+  object-fit: contain;
+}
+
+.qc-title {
+  font-size: 1.25rem;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+  margin: 0;
+}
+
+.qc-subtitle {
+  font-size: 0.75rem;
+  color: #718096;
+  margin-top: 0.25rem;
+}
+
+.qc-header-right {
+  text-align: right;
+}
+
+/* =========================
+   Navbar
+========================= */
+
+.app-navbar {
+  display: flex;
+  align-items: center;
+  gap: 24px;
+  padding: 14px 24px;
+  background-color: #0f172a;
+  box-shadow: 0 4px 10px rgba(0, 0, 0, 0.15);
+}
+
+/* Menu link */
+.app-link {
+  color: #cbd5f5;
+  text-decoration: none;
+  font-size: 15px;
+  font-weight: 500;
+  padding: 6px 12px;
+  border-radius: 8px;
+  transition: all 0.2s ease;
+}
+
+.app-link:hover {
+  background-color: #1e293b;
+  color: #ffffff;
+}
+
+/* Active link (NavLink) */
+.app-link-active {
+  background-color: #2563eb;
+  color: #ffffff;
+}
+
+/* =========================
+   Page Content
+========================= */
+
+.app-content {
+  padding: 24px;
+}
+
+/* =========================
+   Footer
+========================= */
+.qc-footer {
+  width: 100%;
+  min-width: 100vw;
+  background: rgba(255, 255, 255, 0.95);
+  backdrop-filter: blur(10px);
+  box-shadow: 0 5px 20px rgba(255, 255, 255, 0.1);
+}
+
+.qc-footer-content {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 1.25rem 2rem;
+  gap: 1rem;
+  font-size: 0.75rem;
+  color: #718096;
+}
+
+.qc-footer-version {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}

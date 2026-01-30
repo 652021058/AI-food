@@ -1,0 +1,13 @@
+train: ../train/images
+val: ../valid/images
+test: ../test/images
+
+nc: 4
+names: ['Carrot', 'Chicken_Shred', 'Peas', 'Potato_White']
+
+roboflow:
+  workspace: thanat-9ygau
+  project: appetite-rawmat
+  version: 2
+  license: CC BY 4.0
+  url: https://universe.roboflow.com/thanat-9ygau/appetite-rawmat/dataset/2
