@@ -26,8 +26,6 @@ function App() {
   const [previewUrl, setPreviewUrl] = useState<string | undefined>();
   const [fileName, setFileName] = useState<string>("");
   const [cameraOn, setCameraOn] = useState(false);
-  const videoRef = useRef<HTMLVideoElement | null>(null);
-  const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const isSubmitting = useRef(false);
 
 
@@ -69,24 +67,10 @@ function App() {
   /* ===============================
    CAMERA CONTROL
     =============================== */
-  const startCamera = async () => {
-    try {
-      const stream = await navigator.mediaDevices.getUserMedia({
-        video: { width: 640, height: 640 },
-        audio: false,
-      });
 
-      if (videoRef.current) {
-        videoRef.current.srcObject = stream;
-        await videoRef.current.play();
-      }
 
-      setCameraOn(true);
-    } catch (err) {
-      console.error(err);
-      alert("Cannot access camera");
-    }
-  };
+
+
   useEffect(() => {
     console.log(
       "NOW (TH):",
@@ -176,19 +160,21 @@ function App() {
 
                       <button
                         className="qc-btn primary"
-                        onClick={startCamera}
+                        onClick={() => setCameraOn(true)}
                       >
                         Open Camera
                       </button>
+
                     </div>
                   )}
 
                   {cameraOn && (
                     <div className="qc-camera-zone">
                       <img
-                        src="http://localhost:8000/cctv"
+                        src={`http://localhost:8000/cctv?t=${Date.now()}`}
                         style={{ width: "100%", height: "100%", objectFit: "cover" }}
                       />
+
 
                       <div className="qc-camera-actions">
                         <button
@@ -237,12 +223,8 @@ function App() {
                       </div>
                     </div>
                   )}
-
-                  <canvas ref={canvasRef} style={{ display: "none" }} />
                 </div>
               </div>
-
-
 
               {/* Preview Card */}
               {previewUrl && (

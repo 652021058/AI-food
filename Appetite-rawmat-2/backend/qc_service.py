@@ -22,9 +22,14 @@ from database.supabase import supabase
 
 MODEL_PATH = r"D:\I-Tail\AI-food_production\Appetite-rawmat-2\food_qc_yolo11\seg_model_v1_accuracy\weights\best.pt"
 
+# =================================================
+# CALIBRATION (ปรับจากหน้างานจริง)
+# =================================================
+CAMERA_HEIGHT_CM = 40
 PIXEL_PER_CM = 37.2
 AVERAGE_THICKNESS = 3
 
+# density (g/cm3)
 DENSITY_TABLE = {
     "Chicken_Shred": 1.05,
     "Carrot": 0.95,
@@ -32,6 +37,7 @@ DENSITY_TABLE = {
     "Potato_White": 1.00
 }
 
+# สี mask ต่อ class (BGR)
 CLASS_INFO = {
     0: {"name": "Carrot", "bgr": (0, 165, 255), "hex": "#FFA500"},
     1: {"name": "Chicken_Shred", "bgr": (0, 0, 255), "hex": "#FF0000"},
