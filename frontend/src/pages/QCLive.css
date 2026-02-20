@@ -182,19 +182,28 @@ body {
 /* กล่องรูป */
 .qc-preview-overlay-wrapper {
   position: relative;
-  width: 50%;        /* ปรับได้ */
+  width: 100%;
+  max-width: 800px;   /* กันมันขยายเกิน */
+  margin: 0 auto;
 }
 
 /* รูปหลัก */
 .qc-preview-overlay-wrapper img {
   width: 100%;
+  height: auto;       /* ⭐ ตัวนี้กันบีบ */
   display: block;
 }
+
+
 
 /* overlay */
 .qc-overlay-image {
   position: absolute;
-  inset: 0;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: contain;   /* ⭐ กันยืด */
   opacity: 0.6;
   pointer-events: none;
 }

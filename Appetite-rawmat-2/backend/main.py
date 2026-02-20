@@ -16,6 +16,10 @@ from qc_service import run_qc, save_qc_result
 
 app = FastAPI()
 
+camera = None
+camera_lock = threading.Lock()
+
+
 # ===============================
 # CORS
 # ===============================
@@ -27,49 +31,111 @@ app.add_middleware(
 )
 
 # ===============================
+# Camera
+# ===============================
+@app.post("/camera/open")
+def open_camera():
+    global camera
+    with camera_lock:
+        if camera is None:
+            camera = cv2.VideoCapture(0)
+            if not camera.isOpened():
+                camera = None
+                return {"error": "Cannot open camera"}
+    return {"status": "opened"}
+
+@app.post("/camera/close")
+def close_camera():
+    global camera
+    with camera_lock:
+        if camera:
+            camera.release()
+            camera = None
+    return {"status": "closed"}
+
+@app.post("/qc/camera")
+def qc_from_usb_camera():
+    global camera
+    with camera_lock:
+        if camera is None:
+            return JSONResponse(status_code=400, content={"error": "Camera not opened"})
+
+        ret, frame = camera.read()
+        if not ret:
+            return JSONResponse(status_code=500, content={"error": "Capture failed"})
+
+    frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
+    # img = Image.fromarray(frame).resize((640, 640))
+    img = Image.fromarray(frame) 
+    pil_img = pil_img.convert("RGB")
+
+
+    buf = io.BytesIO()
+    img.save(buf, format="JPEG")
+    image_bytes = buf.getvalue()
+
+    result = run_qc(image_bytes)
+    result["status"] = "PASS" if result["status"] in ["Approved", "PASS"] else "FAIL"
+
+    filename = f"usb_{datetime.now().strftime('%Y%m%d_%H%M%S')}.jpg"
+    raw_path = upload_image(image_bytes, filename, "raw")
+
+    overlay_path = upload_image(
+        result["overlay_image"], "overlay.png", "overlay", "image/png"
+    )
+
+    result["image_url"] = get_public_url(raw_path)
+    result["overlay_url"] = get_public_url(overlay_path)
+    result["created_at"] = save_qc_result(raw_path, result)
+
+    return JSONResponse(content=ensure_json_safe(result))
+
+
+
+# ===============================
 # CCTV
 # ===============================
-CCTV_URL = "rtsp://Admin1:12345678@192.168.1.106:554/stream2"
-latest_frame = None
-lock = threading.Lock()
+# CCTV_URL = "rtsp://Admin1:12345678@192.168.1.106:554/stream2"
+# latest_frame = None
+# lock = threading.Lock()
 
 # ===============================
 # CCTV Background Thread  ✅ (เพิ่มใหม่)
 # ===============================
-def camera_loop():
-    global latest_frame
+# def camera_loop():
+#     global latest_frame
 
-    while True:
-        cap = cv2.VideoCapture(CCTV_URL, cv2.CAP_FFMPEG)
-        cap.set(cv2.CAP_PROP_OPEN_TIMEOUT_MSEC, 10000)
-        cap.set(cv2.CAP_PROP_READ_TIMEOUT_MSEC, 10000)
+#     while True:
+#         cap = cv2.VideoCapture(CCTV_URL, cv2.CAP_FFMPEG)
+#         cap.set(cv2.CAP_PROP_OPEN_TIMEOUT_MSEC, 10000)
+#         cap.set(cv2.CAP_PROP_READ_TIMEOUT_MSEC, 10000)
 
-        if not cap.isOpened():
-            print("❌ Cannot open Tapo CCTV, retrying...")
-            time.sleep(5)
-            continue
+#         if not cap.isOpened():
+#             print("❌ Cannot open Tapo CCTV, retrying...")
+#             time.sleep(5)
+#             continue
 
-        print("✅ CCTV connected")
+#         print("✅ CCTV connected")
 
-        while True:
-            ret, frame = cap.read()
-            if not ret:
-                print("⚠️ CCTV frame lost, reconnecting...")
-                break
+#         while True:
+#             ret, frame = cap.read()
+#             if not ret:
+#                 print("⚠️ CCTV frame lost, reconnecting...")
+#                 break
 
-            with lock:
-                latest_frame = frame.copy()
+#             with lock:
+#                 latest_frame = frame.copy()
 
-        cap.release()
-        time.sleep(2)
+#         cap.release()
+#         time.sleep(2)
 
 
 # ===============================
 # Start camera on startup ✅ (เพิ่มใหม่)
 # ===============================
-@app.on_event("startup")
-def start_camera():
-    threading.Thread(target=camera_loop, daemon=True).start()
+# @app.on_event("startup")
+# def start_camera():
+#     threading.Thread(target=camera_loop, daemon=True).start()
 
 
 # ===============================
@@ -79,7 +145,8 @@ def preprocess_image(image_bytes: bytes) -> bytes:
     img = Image.open(io.BytesIO(image_bytes))
     img = ImageOps.exif_transpose(img)
     img = img.convert("RGB")
-    img = img.resize((640, 640))
+    # img = img.resize((640, 640))
+    img = img.convert("RGB")
 
     buf = io.BytesIO()
     img.save(buf, format="JPEG")
@@ -99,30 +166,30 @@ def ensure_json_safe(obj):
 # ===============================
 # CCTV Stream (LIVE) ✏️ แก้
 # ===============================
-def gen_frames():
-    global latest_frame
+# def gen_frames():
+#     global latest_frame
 
-    while True:
-        with lock:
-            if latest_frame is None:
-                continue
-            frame = latest_frame.copy()
+#     while True:
+#         with lock:
+#             if latest_frame is None:
+#                 continue
+#             frame = latest_frame.copy()
 
-        _, buffer = cv2.imencode(".jpg", frame)
-        yield (
-            b"--frame\r\n"
-            b"Content-Type: image/jpeg\r\n\r\n"
-            + buffer.tobytes()
-            + b"\r\n"
-        )
+#         _, buffer = cv2.imencode(".jpg", frame)
+#         yield (
+#             b"--frame\r\n"
+#             b"Content-Type: image/jpeg\r\n\r\n"
+#             + buffer.tobytes()
+#             + b"\r\n"
+#         )
 
 
-@app.get("/cctv")
-def cctv_stream():
-    return StreamingResponse(
-        gen_frames(),
-        media_type="multipart/x-mixed-replace; boundary=frame",
-    )
+# @app.get("/cctv")
+# def cctv_stream():
+#     return StreamingResponse(
+#         gen_frames(),
+#         media_type="multipart/x-mixed-replace; boundary=frame",
+#     )
 
 
 # ===============================
@@ -131,63 +198,136 @@ def cctv_stream():
 @app.post("/qc")
 async def qc_api(file: UploadFile = File(...)):
     try:
-        image_bytes = preprocess_image(await file.read())
-        result = run_qc(image_bytes)
-        result["status"] = "PASS" if result["status"] in ["Approved", "PASS"] else "FAIL"
+        print("📥 File received:", file.filename)
 
-        raw_path = upload_image(image_bytes, file.filename, "raw")
-        overlay_path = upload_image(
-            result["overlay_image"], "overlay.png", "overlay", "image/png"
-        )
+        # ===============================
+        # 1. อ่านไฟล์
+        # ===============================
+        raw_bytes = await file.read()
+        if not raw_bytes:
+            return JSONResponse(status_code=400, content={"error": "Empty file"})
 
-        result["image_url"] = get_public_url(raw_path)
-        result["overlay_url"] = get_public_url(overlay_path)
+        # ===============================
+        # 2. Preprocess
+        # ===============================
+        try:
+            image_bytes = preprocess_image(raw_bytes)
+        except Exception as e:
+            print("❌ Preprocess error:", e)
+            return JSONResponse(status_code=400, content={"error": "Invalid image file"})
 
-        result["created_at"] = save_qc_result(raw_path, result)
+        # ===============================
+        # 3. Run QC
+        # ===============================
+        try:
+            result = run_qc(image_bytes)
+        except Exception as e:
+            print("❌ run_qc error:", e)
+            return JSONResponse(status_code=500, content={"error": "QC processing failed"})
+
+        if not isinstance(result, dict):
+            return JSONResponse(status_code=500, content={"error": "Invalid QC result format"})
+
+        # ===============================
+        # 4. Normalize status
+        # ===============================
+        result["status"] = "PASS" if result.get("status") in ["Approved", "PASS"] else "FAIL"
+
+        # ===============================
+        # 5. Upload RAW image
+        # ===============================
+        try:
+            raw_path = upload_image(image_bytes, file.filename, "raw")
+            result["image_url"] = get_public_url(raw_path)
+        except Exception as e:
+            print("❌ RAW upload error:", e)
+            result["image_url"] = None
+            raw_path = None
+
+        # ===============================
+        # 6. Upload overlay image (ถ้ามี)
+        # ===============================
+        overlay_image = result.get("overlay_image")
+
+        if overlay_image:
+            try:
+                overlay_path = upload_image(
+                    overlay_image,
+                    f"overlay_{file.filename}",
+                    "overlay",
+                    "image/png"
+                )
+                result["overlay_url"] = get_public_url(overlay_path)
+            except Exception as e:
+                print("❌ Overlay upload error:", e)
+                result["overlay_url"] = None
+        else:
+            result["overlay_url"] = None
+
+        # ลบ overlay_image ออกจาก response (เพราะเป็น bytes)
+        result.pop("overlay_image", None)
+
+        # ===============================
+        # 7. Save to database (ถ้า raw_path มีค่า)
+        # ===============================
+        if raw_path:
+            try:
+                result["created_at"] = save_qc_result(raw_path, result)
+            except Exception as e:
+                print("❌ Database save error:", e)
+                result["created_at"] = None
+        else:
+            result["created_at"] = None
+
+        # ===============================
+        # 8. Return safe JSON
+        # ===============================
         return JSONResponse(content=ensure_json_safe(result))
 
     except Exception as e:
+        print("🔥 FATAL ERROR:", e)
         return JSONResponse(status_code=500, content={"error": str(e)})
+
 
 
 # ===============================
 # QC from CCTV ✅ ใช้ได้ทันที
 # ===============================
-@app.post("/qc/camera")
-def qc_from_camera():
-    try:
-        with lock:
-            if latest_frame is None:
-                return JSONResponse(
-                    status_code=503,
-                    content={"error": "Camera not ready"},
-                )
-            frame = latest_frame.copy()
+# @app.post("/qc/camera")
+# def qc_from_camera():
+#     try:
+#         with lock:
+#             if latest_frame is None:
+#                 return JSONResponse(
+#                     status_code=503,
+#                     content={"error": "Camera not ready"},
+#                 )
+#             frame = latest_frame.copy()
 
-        frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
-        img = Image.fromarray(frame).resize((640, 640))
+#         frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
+#         img = Image.fromarray(frame).resize((640, 640))
 
-        buf = io.BytesIO()
-        img.save(buf, format="JPEG")
-        image_bytes = buf.getvalue()
+#         buf = io.BytesIO()
+#         img.save(buf, format="JPEG")
+#         image_bytes = buf.getvalue()
 
-        result = run_qc(image_bytes)
-        result["status"] = "PASS" if result["status"] in ["Approved", "PASS"] else "FAIL"
+#         result = run_qc(image_bytes)
+#         result["status"] = "PASS" if result["status"] in ["Approved", "PASS"] else "FAIL"
 
-        filename = f"cctv_{datetime.now().strftime('%Y%m%d_%H%M%S')}.jpg"
-        raw_path = upload_image(image_bytes, filename, "raw")
-        overlay_path = upload_image(
-            result["overlay_image"], "overlay.png", "overlay", "image/png"
-        )
+#         filename = f"cctv_{datetime.now().strftime('%Y%m%d_%H%M%S')}.jpg"
+#         raw_path = upload_image(image_bytes, filename, "raw")
+#         overlay_path = upload_image(
+#             result["overlay_image"], "overlay.png", "overlay", "image/png"
+#         )
 
-        result["image_url"] = get_public_url(raw_path)
-        result["overlay_url"] = get_public_url(overlay_path)
-        result["created_at"] = save_qc_result(raw_path, result)
+#         result["image_url"] = get_public_url(raw_path)
+#         result["overlay_url"] = get_public_url(overlay_path)
+#         result["created_at"] = save_qc_result(raw_path, result)
 
-        return JSONResponse(content=ensure_json_safe(result))
+#         return JSONResponse(content=ensure_json_safe(result))
 
-    except Exception as e:
-        return JSONResponse(status_code=500, content={"error": str(e)})
+#     except Exception as e:
+#         return JSONResponse(status_code=500, content={"error": str(e)})
 
 
 # ===============================
@@ -223,7 +363,7 @@ def qc_history(
     query = (
         supabase
         .table("qc_result")
-        .select("id_qc, image_name, total_weight, status, created_at")
+        .select("id_qc, image_name, total_count, status, created_at")
         .order("created_at", desc=True)
     )
 
@@ -237,7 +377,7 @@ def qc_history(
     items_res = (
         supabase
         .table("qc_item")
-        .select("qc_id, class, weight, ratio")
+        .select("qc_id, class, count, ratio")
         .in_("qc_id", qc_ids)
         .execute()
     )

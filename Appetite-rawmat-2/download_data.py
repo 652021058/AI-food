@@ -11,6 +11,3 @@ version = project.version(2)
 
 # ดาวน์โหลด dataset เป็นฟอร์แมต YOLOv11
 dataset = version.download("yolov11")    
-
-
-                

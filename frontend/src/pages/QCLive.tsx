@@ -1,23 +1,25 @@
 import { useState, useRef, useEffect } from "react";
 import { Upload, Loader2, BarChart3, CheckCircle2, Camera, X } from "lucide-react";
 import "./QCLive.css";
+// import { image } from "framer-motion/client";
 
 type QCItem = {
   class: string;
-  weight: number;
+  count: number;
   ratio: number;
-  color: string; // สีจาก backend
+  color: string;
 };
 
 type QCResult = {
-  total_weight: number;
+  total_count: number;
   status: "PASS" | "FAIL";
   items: QCItem[];
   overlay_image?: string | null;
-  image_url?: string;        // 👈 เพิ่ม
-  overlay_url?: string | null; // 👈 เพิ่ม
-  created_at: string; // 👈 เพิ่มบรรทัดนี้
+  image_url?: string;
+  overlay_url?: string | null;
+  created_at: string;
 };
+
 
 
 function App() {
@@ -27,6 +29,10 @@ function App() {
   const [fileName, setFileName] = useState<string>("");
   const [cameraOn, setCameraOn] = useState(false);
   const isSubmitting = useRef(false);
+  const videoRef = useRef<HTMLVideoElement | null>(null);
+  const canvasRef = useRef<HTMLCanvasElement | null>(null);
+  const streamRef = useRef<MediaStream | null>(null);
+
 
 
   const handleUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -67,8 +73,100 @@ function App() {
   /* ===============================
    CAMERA CONTROL
     =============================== */
+  const openCamera = async () => {
+    // ✅ ถ้ามี stream อยู่แล้ว ไม่ต้องเปิดใหม่
+    if (streamRef.current) return;
+
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({
+        video: true,
+        audio: false,
+      });
+
+      streamRef.current = stream;
+      setCameraOn(true);
+    } catch (err) {
+      console.error(err);
+      alert("ไม่สามารถเปิดกล้องได้");
+    }
+  };
+
+  const closeCamera = () => {
+    if (streamRef.current) {
+      streamRef.current.getTracks().forEach(t => t.stop());
+      streamRef.current = null;
+    }
+    setCameraOn(false);
+  };
+
+  const captureFromCamera = async () => {
+    if (!videoRef.current || !canvasRef.current) return;
+    if (isSubmitting.current) return;
+
+    isSubmitting.current = true;
+    setLoading(true);
+    setResult(null);
+
+    const video = videoRef.current;
+    const canvas = canvasRef.current;
+    const ctx = canvas.getContext("2d");
+    if (!ctx) return;
+
+    // canvas.width = 640;
+    // canvas.height = 640;
+    // ctx.drawImage(video, 0, 0, 640, 640);
+
+    const videoWidth = video.videoWidth;
+    const videoHeight = video.videoHeight;
+
+    canvas.width = videoWidth;
+    canvas.height = videoHeight;
+
+    ctx.drawImage(video, 0, 0, videoWidth, videoHeight);
 
 
+
+    const blob = await new Promise<Blob | null>(resolve =>
+      canvas.toBlob(resolve, "image/jpeg")
+    );
+
+    if (!blob) return;
+
+    const formData = new FormData();
+    formData.append("file", blob, "camera.jpg");
+
+    setPreviewUrl(URL.createObjectURL(blob));
+    setFileName("Webcam Capture");
+
+    try {
+      const res = await fetch("http://127.0.0.1:8000/qc", {
+        method: "POST",
+        body: formData,
+      });
+
+      const data: QCResult = await res.json();
+      setResult(data);
+    } catch (err) {
+      alert("QC Failed");
+    } finally {
+      setLoading(false);
+      isSubmitting.current = false;
+    }
+  };
+
+  /* ✅ เพิ่ม useEffect ตรงนี้ */
+  useEffect(() => {
+    if (!cameraOn) return;
+    if (!videoRef.current) return;
+    if (!streamRef.current) return;
+
+    videoRef.current.srcObject = streamRef.current;
+    videoRef.current.play();
+
+    return () => {
+      videoRef.current?.pause();
+    };
+  }, [cameraOn]);
 
 
   useEffect(() => {
@@ -103,6 +201,7 @@ function App() {
     })
   );
 
+  //==========================Upload image==========================
   return (
     <div className="qc-app">
       {/* Main Content */}
@@ -122,12 +221,6 @@ function App() {
                     <p className="qc-upload-title">
                       Select File to Upload
                     </p>
-                    <p className="qc-upload-description">
-                      Accepted formats: PNG, JPG, JPEG
-                    </p>
-                    <p className="qc-upload-description">
-                      Maximum file size: 10 MB
-                    </p>
                     <input
                       type="file"
                       accept="image/*"
@@ -139,7 +232,7 @@ function App() {
               </div>
 
               {/* CCTV Camera Card */}
-              <div className="qc-card">
+              {/* <div className="qc-card">
                 <div className="qc-card-header">
                   <h2 className="qc-card-title">CCTV Camera</h2>
                 </div>
@@ -224,7 +317,56 @@ function App() {
                     </div>
                   )}
                 </div>
+              </div> */}
+
+              {/* ==========================Camera==========================   */}
+              <div className="qc-card">
+                <div className="qc-card-header">
+                  <h2 className="qc-card-title">Computer Camera</h2>
+                </div>
+
+                <div className="qc-card-body">
+                  {!cameraOn && (
+                    <div className="qc-upload-zone">
+                      <Camera className="qc-upload-icon" size={40} />
+                      <p className="qc-upload-title">Open Computer Camera</p>
+
+                      <button className="qc-btn primary" onClick={openCamera}>
+                        Open Camera
+                      </button>
+                    </div>
+                  )}
+
+                  {cameraOn && (
+                    <div className="qc-camera-zone">
+                      <video
+                        ref={videoRef}
+                        autoPlay          // ✅ ต้องมี
+                        playsInline
+                        muted
+                        style={{
+                          width: "100%",
+                          height: "360px",
+                          objectFit: "cover",
+                          background: "#000",
+                        }}
+                      />
+
+                      <div className="qc-camera-actions">
+                        <button onClick={captureFromCamera}>
+                          Capture & QC
+                        </button>
+
+                        <button className="qc-btn danger" onClick={closeCamera}>
+                          <X size={16} /> Close Camera
+                        </button>
+                      </div>
+                    </div>
+                  )}
+                </div>
               </div>
+              <canvas ref={canvasRef} style={{ display: "none" }} />
+
 
               {/* Preview Card */}
               {previewUrl && (
@@ -250,7 +392,7 @@ function App() {
                       </p>
                       <p className="qc-success-message">
                         <CheckCircle2 size={14} />
-                        Image uploaded successfully
+                        Image processed successfully
                       </p>
                     </div>
                   </div>
@@ -311,8 +453,6 @@ function App() {
                     </div>
                   )}
 
-
-
                   {/* Analysis Summary Card */}
                   <div className="qc-card">
                     <div className="qc-card-header">
@@ -322,12 +462,12 @@ function App() {
                       <div className="qc-summary-grid">
                         {/* Total Weight */}
                         <div className="qc-summary-box">
-                          <p className="qc-summary-label">Total Weight</p>
+                          <p className="qc-summary-label">Total Count</p>
                           <div className="qc-summary-value-wrapper">
                             <p className="qc-summary-value">
-                              {result.total_weight}
+                              {result.total_count}
                             </p>
-                            <p className="qc-summary-unit">grams</p>
+                            <p className="qc-summary-unit">items</p>
                           </div>
                           <p className="qc-summary-meta">
                             Measured at: {thaiTime(result.created_at)}
@@ -369,7 +509,7 @@ function App() {
                         <thead>
                           <tr>
                             <th>Classification Category</th>
-                            <th>Weight (grams)</th>
+                            <th>Count (items)</th>
                             <th>Distribution Percentage</th>
                           </tr>
                         </thead>
@@ -389,12 +529,10 @@ function App() {
                               </td>
 
 
-                              {/* ===== Weight ===== */}
+                              {/* ===== count ===== */}
                               <td>
-                                <span className="qc-table-weight">{item.weight}</span>
+                                <span className="qc-table-count">{item.count}</span>
                               </td>
-
-                              {/* ===== Ratio + Progress ===== */}
                               <td>
                                 <div className="qc-progress-wrapper">
                                   <span className="qc-progress-percentage">
@@ -422,7 +560,7 @@ function App() {
                         <tfoot>
                           <tr>
                             <td className="qc-table-footer">Total</td>
-                            <td className="qc-table-footer">{result.total_weight}</td>
+                            <td className="qc-table-footer">{result.total_count}</td>
                             <td className="qc-table-footer">100%</td>
                           </tr>
                         </tfoot>

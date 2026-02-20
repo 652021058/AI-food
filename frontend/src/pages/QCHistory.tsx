@@ -3,14 +3,14 @@ import "./QCHistory.css";
 
 type QCItem = {
   class: string;
-  weight: number;
+  count: number;
   ratio: number;
 };
 
 type QCHistory = {
   id_qc: number;
   image_name: string;
-  total_weight: number;
+  total_count: number;
   status: "PASS" | "FAIL";
   created_at: string;
   items: QCItem[];
@@ -107,7 +107,7 @@ export default function QCHistory() {
             <tr>
               <th>Date</th>
               <th>Image</th>
-              <th>Total Weight (g)</th>
+              <th>Total count (g)</th>
               <th>Status</th>
               <th>Detail</th>
             </tr>
@@ -120,7 +120,7 @@ export default function QCHistory() {
                 <tr>
                   <td>{formatThaiTime(row.created_at)}</td>
                   <td>{row.image_name}</td>
-                  <td>{row.total_weight.toFixed(2)}</td>
+                  <td>{row.total_count.toFixed(2)}</td>
                   <td>
                     <span
                       className={`status ${
@@ -150,7 +150,7 @@ export default function QCHistory() {
                         <thead>
                           <tr>
                             <th>Class</th>
-                            <th>Weight (g)</th>
+                            <th>count (g)</th>
                             <th>Ratio (%)</th>
                           </tr>
                         </thead>
@@ -163,7 +163,7 @@ export default function QCHistory() {
                             row.items.map((item, idx) => (
                               <tr key={idx}>
                                 <td>{item.class}</td>
-                                <td>{item.weight.toFixed(2)}</td>
+                                <td>{item.count.toFixed(2)}</td>
                                 <td>{(item.ratio * 100).toFixed(1)}</td>
                               </tr>
                             ))
