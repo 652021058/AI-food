@@ -107,7 +107,7 @@ export default function QCHistory() {
             <tr>
               <th>Date</th>
               <th>Image</th>
-              <th>Total count (g)</th>
+              <th>Total count</th>
               <th>Status</th>
               <th>Detail</th>
             </tr>
@@ -120,7 +120,8 @@ export default function QCHistory() {
                 <tr>
                   <td>{formatThaiTime(row.created_at)}</td>
                   <td>{row.image_name}</td>
-                  <td>{row.total_count.toFixed(2)}</td>
+                  <td>{row.total_count}</td>
+                  {/* <td>{row.total_count.toFixed(2)}</td> */}
                   <td>
                     <span
                       className={`status ${
@@ -150,7 +151,7 @@ export default function QCHistory() {
                         <thead>
                           <tr>
                             <th>Class</th>
-                            <th>count (g)</th>
+                            <th>count</th>
                             <th>Ratio (%)</th>
                           </tr>
                         </thead>
@@ -163,8 +164,10 @@ export default function QCHistory() {
                             row.items.map((item, idx) => (
                               <tr key={idx}>
                                 <td>{item.class}</td>
-                                <td>{item.count.toFixed(2)}</td>
-                                <td>{(item.ratio * 100).toFixed(1)}</td>
+                                {/* <td>{item.count.toFixed(2)}</td> */}
+                                <td>{item.count}</td>
+                                <td>{item.ratio.toFixed(2)}%</td>
+                                {/* <td>{(item.ratio * 100).toFixed(1)}</td> */}
                               </tr>
                             ))
                           )}
